@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library LibERC721 {
     struct ERC721DiamondStorage {
@@ -27,6 +28,8 @@ library LibERC721 {
         mapping(uint256 => address) _tokenApprovals;
         // Mapping from owner to operator approvals
         mapping(address => mapping(address => bool)) _operatorApprovals;
+        // ERC20 Token Address
+        address erc20TokenAddress;
     }
 
     // Returns the struct from a specified position in contract storage
@@ -42,7 +45,7 @@ library LibERC721 {
     }
 }
 
-contract NFTFacet is Context, ERC165, IERC721, IERC721Metadata {
+contract NFTFacetV2 is Context, ERC165, IERC721, IERC721Metadata {
     using Address for address;
     using Strings for uint256;
 
@@ -64,6 +67,17 @@ contract NFTFacet is Context, ERC165, IERC721, IERC721Metadata {
         ds.supportedInterfaces[0x80ac58cd] = true;
     }
 
+    function setERC20TokenAddress(address _tokenAddress) public {
+        LibDiamond.enforceIsContractOwner();
+        LibERC721.ERC721DiamondStorage storage dsERC721 = LibERC721.diamondStorage();
+        dsERC721.erc20TokenAddress = _tokenAddress;
+    }
+
+    function ERC20TokenAddress() public view returns (address) {
+        LibERC721.ERC721DiamondStorage storage dsERC721 = LibERC721.diamondStorage();
+        return dsERC721.erc20TokenAddress;
+    }
+
     function baseURI() public view returns (string memory) {
         return _baseURI();
     }
@@ -72,11 +86,15 @@ contract NFTFacet is Context, ERC165, IERC721, IERC721Metadata {
         return _exists(tokenId);
     }
 
+    // mint NFT with 20 JungToken
     function mint() public payable {
-        require(msg.value == 0.0001 ether, "Not enough ether sent to mint");
         LibERC721.ERC721DiamondStorage storage dsERC721 = LibERC721.diamondStorage();
-        _mint(_msgSender(), dsERC721._totalSupply);
-        dsERC721._totalSupply++;
+        require(
+            IERC20(dsERC721.erc20TokenAddress).balanceOf(msg.sender) >= 10 * 10 ** 18,
+            "Jung NFT: Not enough ether sent to mint"
+        );
+        require(IERC20(dsERC721.erc20TokenAddress).transferFrom(msg.sender, address(this), 10 * 10 ** 18));
+        _mint(_msgSender(), dsERC721._totalSupply++);
     }
 
     function safeMint(address to, uint256 tokenId) public {
@@ -148,7 +166,7 @@ contract NFTFacet is Context, ERC165, IERC721, IERC721Metadata {
      * @dev See {IERC721-approve}.
      */
     function approve(address to, uint256 tokenId) public virtual override {
-        address owner = NFTFacet.ownerOf(tokenId);
+        address owner = NFTFacetV2.ownerOf(tokenId);
         require(to != owner, "ERC721: approval to current owner");
 
         require(
@@ -367,11 +385,11 @@ contract NFTFacet is Context, ERC165, IERC721, IERC721Metadata {
      * Emits a {Transfer} event.
      */
     function _transfer(address from, address to, uint256 tokenId) internal virtual {
-        require(NFTFacet.ownerOf(tokenId) == from, "ERC721: transfer from incorrect owner");
+        require(NFTFacetV2.ownerOf(tokenId) == from, "ERC721: transfer from incorrect owner");
         require(to != address(0), "ERC721: transfer to the zero address");
 
         // Check that tokenId was not transferred by `_beforeTokenTransfer` hook
-        require(NFTFacet.ownerOf(tokenId) == from, "ERC721: transfer from incorrect owner");
+        require(NFTFacetV2.ownerOf(tokenId) == from, "ERC721: transfer from incorrect owner");
 
         LibERC721.ERC721DiamondStorage storage dsERC721 = LibERC721.diamondStorage();
 
@@ -397,7 +415,7 @@ contract NFTFacet is Context, ERC165, IERC721, IERC721Metadata {
     function _approve(address to, uint256 tokenId) internal virtual {
         LibERC721.ERC721DiamondStorage storage dsERC721 = LibERC721.diamondStorage();
         dsERC721._tokenApprovals[tokenId] = to;
-        emit Approval(NFTFacet.ownerOf(tokenId), to, tokenId);
+        emit Approval(NFTFacetV2.ownerOf(tokenId), to, tokenId);
     }
 
     /**
