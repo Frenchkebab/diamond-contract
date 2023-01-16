@@ -5,7 +5,7 @@ const {
   FacetCutAction,
   removeSelectors,
   findAddressPositionInFacets,
-} = require('../scripts/libraries/diamond.js');
+} = require('./libraries/diamond.js');
 
 const { deployDiamond } = require('../scripts/deploy.js');
 
@@ -49,9 +49,11 @@ describe('DiamondTest', async function () {
     let selectors = getSelectors(diamondCutFacet);
     result = await diamondLoupeFacet.facetFunctionSelectors(addresses[0]);
     assert.sameMembers(result, selectors);
+
     selectors = getSelectors(diamondLoupeFacet);
     result = await diamondLoupeFacet.facetFunctionSelectors(addresses[1]);
     assert.sameMembers(result, selectors);
+
     selectors = getSelectors(ownershipFacet);
     result = await diamondLoupeFacet.facetFunctionSelectors(addresses[2]);
     assert.sameMembers(result, selectors);
@@ -80,10 +82,13 @@ describe('DiamondTest', async function () {
     const Test1Facet = await ethers.getContractFactory('Test1Facet');
     const test1Facet = await Test1Facet.deploy();
     await test1Facet.deployed();
+
     addresses.push(test1Facet.address);
+
     const selectors = getSelectors(test1Facet).remove([
       'supportsInterface(bytes4)',
     ]);
+
     tx = await diamondCutFacet.diamondCut(
       [
         {
